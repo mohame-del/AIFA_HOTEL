@@ -31,6 +31,9 @@ coverage/**
 .wrangler/
 .dev.vars
 
+# Vercel
+.vercel
+
 # Generated prototype archive (reproducible from aifa-html-prototype/)
 aifa-html-prototype.zip
 

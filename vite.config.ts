@@ -12,4 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Hard-pin the Nitro target to Vercel so production builds (local + Vercel CI)
+  // always emit the Vercel Build Output API under `.vercel/output`. Without this the
+  // wrapper falls back to its `cloudflare-module` default. Inside a Lovable build the
+  // preset is pinned by `LOVABLE_NITRO_PRESET`, so this only affects self-hosted builds.
+  nitro: { preset: "vercel" },
 });

@@ -110,7 +110,7 @@ enough to read, test and reason about.
 | Icons                | lucide-react                                                               |
 | Notifications        | sonner                                                                     |
 | Build tool           | Vite 8 with the Lovable TanStack Start config                              |
-| Server target        | [Nitro](https://nitro.build) (Cloudflare Workers by default)               |
+| Server target        | [Nitro](https://nitro.build) (Vercel preset; see Deployment)               |
 | Tests                | Vitest + Testing Library (jsdom)                                           |
 | Linting / formatting | ESLint (flat config) + Prettier                                            |
 
@@ -128,9 +128,9 @@ The project separates **business rules** from the **UI**:
    metadata, error/not-found pages).
 4. `src/components/aifa/` contains the feature UI (shell, room grid,
    reservations table, feedback view, guest kiosk, supervisor overview, dialogs).
-5. `src/components/ui/` contains the shadcn/ui primitives. Only a subset
-   (`button`, `label`, `dialog`, `sheet`, `alert-dialog`) is currently rendered;
-   the remaining primitives are available for reuse.
+5. `src/components/ui/` contains only the shadcn/ui primitives the app actually
+   uses (`button`, `label`, `dialog`, `sheet`, `alert-dialog`, plus the `sonner`
+   toaster). Extra primitives can be re-added on demand with the shadcn CLI.
 
 All state transitions flow through a single `reducer(state, action)` function in
 `src/lib/hotel/logic.ts`, which keeps status rules verifiable and independent of
@@ -155,8 +155,7 @@ User action ─▶ React component ─▶ dispatch(action)
 │   ├── assets/                  # Bundled images (logo imported by components)
 │   ├── components/
 │   │   ├── aifa/                # Feature UI (shell, grids, tables, kiosk, dialogs)
-│   │   └── ui/                  # shadcn/ui primitives
-│   ├── hooks/                   # Shared React hooks
+│   │   └── ui/                  # shadcn/ui primitives (only those in use)
 │   ├── lib/
 │   │   ├── hotel/               # Domain core
 │   │   │   ├── types.ts         # Domain types (Room, Reservation, Feedback, …)
@@ -181,8 +180,9 @@ User action ─▶ React component ─▶ dispatch(action)
 ├── AGENTS.md                    # Project conventions
 ├── components.json              # shadcn/ui configuration
 ├── eslint.config.js             # ESLint flat config
-├── vite.config.ts               # Vite/TanStack Start config
+├── vite.config.ts               # Vite/TanStack Start config (Nitro preset: vercel)
 ├── vitest.config.ts             # Vitest config
+├── vercel.json                  # Vercel framework preset (tanstack-start)
 └── tsconfig.json                # TypeScript config
 ```
 
@@ -194,19 +194,19 @@ starting the dev server, but it should **not** be edited by hand.
 
 ### Requirements
 
-- **Node.js 20+** (developed and validated on Node.js 22).
-- A package manager. This repository includes both a `bun.lock` (Bun is the
-  primary tool; see `bunfig.toml`) and a `package-lock.json`. **npm** works out
-  of the box if you do not have Bun installed.
+- **Bun** is the package manager (see `bun.lock` / `bunfig.toml`). npm works too
+  if you do not have Bun installed, but Bun is what CI and Vercel use.
+- **Node.js 20+** if you build with npm rather than Bun (developed and validated
+  on Node.js 22).
 
 ### Install and run
 
 ```sh
 # 1. Install dependencies
-npm install        # or: bun install
+bun install        # or: npm install
 
 # 2. Start the dev server (Vite + TanStack Start)
-npm run dev
+bun run dev        # or: npm run dev
 
 # 3. Open the printed local URL (typically http://localhost:5173)
 ```
@@ -216,16 +216,18 @@ guest kiosk at `/guest`.
 
 ## Scripts
 
-| Command              | Description                                   |
-| -------------------- | --------------------------------------------- |
-| `npm run dev`        | Start the development server with hot reload. |
-| `npm run build`      | Create a production build in `.output/`.      |
-| `npm run build:dev`  | Production build in development mode.         |
-| `npm run preview`    | Preview a production build locally.           |
-| `npm run lint`       | Run ESLint over the project.                  |
-| `npm run format`     | Format the codebase with Prettier.            |
-| `npm run test`       | Run the Vitest suite once.                    |
-| `npm run test:watch` | Run Vitest in watch mode.                     |
+| Command               | Description                                       |
+| --------------------- | ------------------------------------------------- |
+| `bun run dev`         | Start the development server with hot reload.     |
+| `bun run build`       | Create a production build in `.vercel/output/`.   |
+| `bun run build:dev`   | Production build in development mode.             |
+| `bun run preview`     | Preview a production build locally.               |
+| `bun run lint`        | Run ESLint over the project.                      |
+| `bun run format`      | Format the codebase with Prettier.                |
+| `bun run test`        | Run the Vitest suite once.                        |
+| `bun run test:watch`  | Run Vitest in watch mode.                         |
+
+`npm run <script>` works as well if you prefer npm.
 
 ## Routes
 
@@ -290,24 +292,31 @@ The suite currently covers:
 ## Production build
 
 ```sh
-npm run build       # emits .output/ (server bundle + static client assets)
-npm run preview     # serve the built output locally
+bun run build       # emits .vercel/output/ (server function + static client assets)
+bun run preview     # serve the built output locally
 ```
 
 The build is produced by Vite through `@lovable.dev/vite-tanstack-config`, which
-wires up TanStack Start and Nitro. The default Nitro preset targets **Cloudflare
-Workers**, so the build output includes a `wrangler.json` runtime manifest under
-`.output/server/`.
+wires up TanStack Start and Nitro. `vite.config.ts` hard-pins the Nitro preset to
+`vercel`, so the build emits the [Vercel Build Output
+API](https://vercel.com/docs/build-output-api/v3) layout: a single server
+function under `.vercel/output/functions/__server.func/` plus static assets and
+`.vercel/output/config.json`.
 
 ## Deployment
 
-Because the build targets Cloudflare via Nitro, the `.output/` directory can be
-deployed to Cloudflare Workers/Pages with Wrangler (or any Nitro-compatible
-host). No secrets or environment variables are required by the application.
+The repository is configured for **Vercel** with zero build configuration:
 
-> Deployment is **not configured** in this repository (there is no CI workflow
-> or Wrangler account configuration). The build output is ready to deploy, but
-> choosing and authenticating a hosting target is left to you.
+- `vercel.json` sets `"framework": "tanstack-start"` so Vercel applies the
+  TanStack Start preset even if auto-detection is skipped.
+- Nitro emits the Vercel Build Output API, so Vercel builds the app with
+  `bun run build` and deploys the generated functions automatically.
+- **bun** is the package manager (see `bun.lock` / `bunfig.toml`); Vercel detects
+  it from the lockfile.
+
+Import the Git repository at <https://vercel.com/new> and deploy — no build
+command, output directory, or environment variables need to be set. The app
+requires no secrets or environment variables.
 
 ## Configuration and environment variables
 
@@ -315,7 +324,8 @@ host). No secrets or environment variables are required by the application.
   `import.meta.env` / `process.env` values and ships no `.env` file.
 - No `.env.example` is provided because there is nothing to configure.
 - Tooling configuration lives in `vite.config.ts`, `vitest.config.ts`,
-  `tsconfig.json`, `eslint.config.js`, `.prettierrc` and `components.json`.
+  `tsconfig.json`, `eslint.config.js`, `.prettierrc`, `components.json` and
+  `vercel.json`.
 
 ## Security notes
 
